@@ -327,8 +327,18 @@ describe("ProjectSchedulesSection with scheduledTask read+create", () => {
     );
   });
 
-  it("resumes a paused schedule and confirms deletion before removing it", async () => {
+  it("confirms the recurring schedule before resuming and confirms deletion", async () => {
     const user = userEvent.setup();
+    const resume = vi.fn(
+      (
+        _id: string,
+        options?: { onSuccess: (result: ScheduleTrigger) => void },
+      ) => options?.onSuccess(SCHEDULE),
+    );
+    vi.mocked(useEnableScheduleTrigger).mockReturnValue({
+      mutate: resume,
+      isPending: false,
+    } as unknown as ReturnType<typeof useEnableScheduleTrigger>);
     vi.mocked(useScheduleTriggers).mockReturnValue({
       data: { data: [{ ...SCHEDULE, enabled: false }] },
     } as unknown as ReturnType<typeof useScheduleTriggers>);
@@ -337,7 +347,27 @@ describe("ProjectSchedulesSection with scheduledTask read+create", () => {
     await user.click(
       screen.getByRole("button", { name: "Resume Weekly summary" }),
     );
-    expect(useEnableScheduleTrigger().mutate).toHaveBeenCalledWith(SCHEDULE.id);
+    const confirmation = screen.getByRole("dialog", {
+      name: "Resume Weekly summary?",
+    });
+    expect(confirmation).toHaveTextContent(
+      "This enables automatic agent runs: At 09:00, only on Monday · UTC.",
+    );
+    expect(resume).not.toHaveBeenCalled();
+    await user.click(
+      within(confirmation).getByRole("button", { name: "Cancel" }),
+    );
+    expect(resume).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Resume Weekly summary" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Enable automatic runs" }),
+    );
+    expect(resume).toHaveBeenCalledWith(SCHEDULE.id, expect.any(Object));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await user.click(
       screen.getByRole("button", { name: "Actions for Weekly summary" }),
     );
