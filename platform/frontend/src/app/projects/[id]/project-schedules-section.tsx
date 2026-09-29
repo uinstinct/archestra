@@ -244,6 +244,7 @@ function ScheduleRow({
   const router = useRouter();
   const { resolve, isResolving } = useResolveRunChat();
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [resumeOpen, setResumeOpen] = useState(false);
   const { data: runs, isPending: loadingRuns } = useScheduleTriggerRuns(
     schedule.id,
     {
@@ -321,9 +322,9 @@ function ScheduleRow({
             className="h-7 px-2 text-xs"
             disabled={enableSchedule.isPending || disableSchedule.isPending}
             onClick={() =>
-              (schedule.enabled ? disableSchedule : enableSchedule).mutate(
-                schedule.id,
-              )
+              schedule.enabled
+                ? disableSchedule.mutate(schedule.id)
+                : setResumeOpen(true)
             }
             aria-label={`${schedule.enabled ? "Pause" : "Resume"} ${schedule.name}`}
           >
@@ -368,6 +369,25 @@ function ScheduleRow({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      {resumeOpen && (
+        <DeleteConfirmDialog
+          open={resumeOpen}
+          onOpenChange={setResumeOpen}
+          title={`Resume ${schedule.name}?`}
+          description={`This enables automatic agent runs: ${formatCronSchedule(schedule.cronExpression)} · ${schedule.timezone}.`}
+          confirmLabel="Enable automatic runs"
+          pendingLabel="Enabling..."
+          confirmVariant="default"
+          isPending={enableSchedule.isPending}
+          onConfirm={() =>
+            enableSchedule.mutate(schedule.id, {
+              onSuccess: (result) => {
+                if (result) setResumeOpen(false);
+              },
+            })
+          }
+        />
+      )}
       {deleteOpen && (
         <DeleteConfirmDialog
           open={deleteOpen}
